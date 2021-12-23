@@ -5,6 +5,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "desktop": "expo-electron start",
     "eject": "expo eject"
   },
   "dependencies": {
@@ -17,8 +18,12 @@
   },
   "devDependencies": {
     "@babel/core": "^7.12.9",
+    "@expo/electron-adapter": "0.0.55",
+    "@expo/webpack-config": "^0.13.1",
     "@types/react": "~17.0.21",
     "@types/react-native": "~0.64.12",
+    "electron": "^9.4.0",
+    "electron-builder": "^22.11.7",
     "typescript": "~4.3.5"
   },
   "private": true
