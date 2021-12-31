@@ -1,36 +1,23 @@
 import { useRef } from 'react'
-import { View, Text, ScrollView } from 'react-native';
-import { UpperRef, MapRef } from './types'
-import { CAMWIDTH, CAMHEIGHT } from './constants'
+import { View, Text} from 'react-native';
+import { UnitListRef, MapRef} from './types'
 import Map from './Map'
-import Upper from './Upper'
+import UnitList from './UnitList'
 import Camera from './Camera'
+import useController from './useController';
 
 
 export default ()=>{
-    const upperRef = useRef<UpperRef>({})
+    const controller = useController()
+    const unitListRef = useRef<UnitListRef>({})
     const mapRef = useRef<MapRef>({})
     const cameraRef = useRef({})
-    const scrollRef = useRef<ScrollView>(null)
-    const subScrollRef = useRef<ScrollView>(null)
     return (
-        <View>
-            <ScrollView
-                style={{height:CAMHEIGHT}}
-                ref={scrollRef}
-                scrollEnabled={false}
-            >
-                <ScrollView
-                    style={{width:CAMWIDTH}}
-                    scrollEnabled={false}
-                    ref={subScrollRef}
-                    horizontal={true}
-                >
-                    <Map ref={mapRef} upperRef={upperRef}/>
-                    <Upper ref={upperRef}/>
-                    <Camera ref={cameraRef} mapRef={mapRef} scrollRef={scrollRef} subScrollRef={subScrollRef}/>
-                </ScrollView>
-            </ScrollView>
+        <View onLayout={(e)=>{mapRef.current.setMargin && mapRef.current.setMargin([e.nativeEvent.layout.x, e.nativeEvent.layout.y])}}>
+            <Camera ref={cameraRef} mapRef={mapRef} controller={controller}>
+                <Map ref={mapRef} unitListRef={unitListRef} controller={controller}/>
+                <UnitList ref={unitListRef} cameraRef={cameraRef}  controller={controller}/>
+            </Camera>
             <Text>Open up App.tsx to start working on your app!</Text>
         </View>
     )

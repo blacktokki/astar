@@ -1,29 +1,57 @@
-import { MutableRefObject, useEffect, useMemo, useRef, forwardRef, RefObject, memo, useState } from 'react'
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Position, UpperRef, CameraRef, MapRef } from './types'
-import { TILESIZE, CAMWIDTH, CAMHEIGHT } from './constants'
-
+import { MutableRefObject, forwardRef, useRef, useImperativeHandle, ReactNode, useMemo, useEffect} from 'react'
+import {  ScrollView } from 'react-native';
+import { CameraRef, MapRef, Controller } from './types'
+import { TILESIZE } from './constants'
+import useInnerWindow from './useInnerWindow'
 
 type Props = {
     mapRef:MutableRefObject<MapRef>,
-    scrollRef:RefObject<ScrollView>
-    subScrollRef:RefObject<ScrollView>
+    controller:Controller,
+    children: ReactNode
 }
 
-export default forwardRef<CameraRef, Props>(({mapRef, scrollRef, subScrollRef}, ref)=>{
+export default forwardRef<CameraRef, Props>(({mapRef, controller, children}, ref)=>{
+    const scrollRef = useRef<ScrollView>(null)
+    const subScrollRef = useRef<ScrollView>(null)
+    const window = useInnerWindow()
+    const setFocusX = (x:number) => {
+        const v = Math.min(Math.max(0, x - window.width * 0.5), TILESIZE * controller.getTiles().width - window.width)
+        mapRef.current.setScrollX && mapRef.current?.setScrollX(v/32)
+        subScrollRef.current?.scrollTo({animated:false, x:v})
+    }
+    const setFocusY = (y:number) => {
+        const v = Math.min(Math.max(0, y - window.height * 0.5), TILESIZE * controller.getTiles().height - window.height)
+        mapRef.current.setScrollY && mapRef.current?.setScrollY(v/32)
+        scrollRef.current?.scrollTo({animated:false, y:v})
+    }
+    useImperativeHandle(ref, ()=>({
+        setFocusX,
+        setFocusY
+    }))
     // useEffect(()=>{
     //     let i = 0
     //     let j = 0
     //     const interval = setInterval(()=>{
-    //         mapRef.current.setScrollY && mapRef.current?.setScrollY(i/32)
-    //         scrollRef.current?.scrollTo({animated:false, y:i})
-    //         // setScrollX(x/32)
-    //         // scrollRef.current?.scrollTo({animated:false, x})
-    //         i = (i < TILESIZE * 100 - CAMHEIGHT)?i + 1 :0
-    //         j = (j < TILESIZE * 100 - CAMWIDTH)?j + 1 :0
+    //         setFocusY(i)
+    //         i = (i < TILESIZE * controller.getTiles().height)?i + 1 :0
+    //         j = (j < TILESIZE * controller.getTiles().width)?j + 1 :0
     //     }, 16)
     //     return ()=>clearInterval(interval)
     // },[])
     
-    return (<></>)
+    return (<ScrollView
+                style={{height:window.height}}
+                ref={scrollRef}
+                scrollEnabled={false}
+            >
+                <ScrollView
+                    style={{width:window.width}}
+                    scrollEnabled={false}
+                    ref={subScrollRef}
+                    horizontal={true}
+                >
+                {children}
+            </ScrollView>
+        </ScrollView>
+    )
 })
