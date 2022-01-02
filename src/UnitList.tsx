@@ -1,64 +1,69 @@
-import { useState, useEffect, forwardRef, useImperativeHandle, useRef, RefObject, MutableRefObject } from 'react'
+import { useState, useEffect, forwardRef, useImperativeHandle, useRef, RefObject, MutableRefObject, useDebugValue } from 'react'
 import { View, Text, StyleSheet } from 'react-native';
 import { Position, UnitListRef, Controller, Unit as UnitProps }from './types'
-import { TILESIZE, SPEED_PER_STEP } from './constants'
+import { TILESIZE, SPEED_PER_STEP, MS_PER_STEP } from './constants'
 import useInnerWindow from './useInnerWindow'
-import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, useCode, call, useAnimatedReaction, cancelAnimation } from 'react-native-reanimated';
 
 function useMoveable(unit:UnitProps){
     const targetPos = useSharedValue(unit.initPos)
-    const pos =  useSharedValue(unit.initPos)
-    const subtargetPos = useSharedValue(unit.initPos)
+    const tx = useSharedValue(unit.initPos[0])
+    const ty = useSharedValue(unit.initPos[1])
+    const subtargetPos = useDerivedValue(()=>{return [tx.value, ty.value] as Position})
+    const ttx = useDerivedValue(()=>withTiming(tx.value, {duration:TILESIZE/SPEED_PER_STEP * MS_PER_STEP, easing:Easing.linear}, animCallback))
+    const tty = useDerivedValue(()=>withTiming(ty.value, {duration:TILESIZE/SPEED_PER_STEP * MS_PER_STEP, easing:Easing.linear}, animCallback))
     const callback = ()=>{
-        let changed = false
-        const nextPos = pos.value.map((value, index)=>{
-            if (value < subtargetPos.value[index]){
-                changed = true
-                return value + SPEED_PER_STEP
-            }
-            if (value > subtargetPos.value[index]){
-                changed = true
-                return value - SPEED_PER_STEP
-            }
-            return value
-        }) as Position
-        // console.log(pos, nextPos, subtargetPos, targetPos)
-        if (changed)
-            unit.nextPos = nextPos
-        else {
-            unit.nextPos = undefined
-            if(pos.value[0]!=targetPos.value[0] || pos.value[1] != targetPos.value[1]){
-                subtargetPos.value = pos.value.map((value, index)=>{
-                    const res = value - value % TILESIZE
-                    if (value < targetPos.value[index])
-                        return res + TILESIZE
-                    if (value > targetPos.value[index])
-                        return res - TILESIZE
-                    return res
-                }) as Position
-                callback()
-            }
-            else
-                unit.moveFinished && unit.moveFinished(unit)
+        if(subtargetPos.value[0]!=targetPos.value[0] || subtargetPos.value[1] != targetPos.value[1]){
+            const _pos = subtargetPos.value.map((value, index)=>{
+                const res = value - value % TILESIZE
+                if (value < targetPos.value[index])
+                    return res + TILESIZE
+                if (value > targetPos.value[index])
+                    return res - TILESIZE
+                return res
+            }) as Position
+            tx.value = _pos[0]
+            ty.value = _pos[1]
         }
-    }
-    unit.setPos = (_pos) =>{
-        pos.value = _pos
-        callback()
+        else
+            unit.moveFinished && unit.moveFinished(unit)
     }
     unit.setTargetPos = (pos) =>{
         targetPos.value = pos;
-        unit.nextPos = undefined
         callback()
     }
-    useEffect(()=>{unit.setTargetPos && unit.setTargetPos(pos.value)}, [])
-    return [pos, targetPos] as [Animated.SharedValue<Position>,  Animated.SharedValue<Position>]
+    let finished = 2
+    const animCallback = (isFinite:boolean) =>{
+        finished += 1
+        if (isFinite && finished==2)callback()
+    }
+
+    const animStyle = useAnimatedStyle(() => {
+        finished = 0
+        const style = {
+            ...StyleSheet.absoluteFillObject,
+            transform: [
+                {translateX: ttx.value},
+                {translateY: tty.value},
+            ],
+        }
+        return style
+    });
+    useAnimatedReaction(
+        () => {
+            unit.postMove && unit.postMove([ttx.value, tty.value])
+        }, 
+        (result, previous) => {
+        },
+        [ttx, tty]
+    );
+    return [ttx, tty, targetPos, animStyle] as [Animated.SharedValue<number>, Animated.SharedValue<number> ,  Animated.SharedValue<Position>, typeof animStyle]
 }
 
 const man = <Text style={{paddingLeft:6}}>🧍</Text>
 
 const Unit = ({unit}:{unit:UnitProps})=>{
-    const [pos, targetPos] = useMoveable(unit)
+    const [ttx, tty, targetPos, animStyle] = useMoveable(unit)
     const animStyleTarget = useAnimatedStyle(() => {
         return {
             ...StyleSheet.absoluteFillObject,
@@ -69,16 +74,7 @@ const Unit = ({unit}:{unit:UnitProps})=>{
             width:TILESIZE, height:TILESIZE, borderWidth:2, borderColor:'greenyellow'
         };
     });
-    const animStyle = useAnimatedStyle(() => {
-        return {
-            ...StyleSheet.absoluteFillObject,
-            transform: [
-                {translateX: pos.value[0]},
-                {translateY: pos.value[1]},
-            ],
-        };
-    });
-    unit.resized && useEffect(()=>unit.resized?unit.resized(pos.value):()=>{}, [useInnerWindow()])
+    unit.resized && useEffect(()=>unit.resized?unit.resized([ttx.value, tty.value]):()=>{}, [useInnerWindow()])
     return <View>
         <Animated.View style={{...animStyleTarget}}/>
         <Animated.View style={{...animStyle}}>

@@ -29,7 +29,7 @@ export type Tiles = Model & {
 }
 
 export type UnitClass = {
-    move:(nextPos:Position, setPos:(pos:Position)=>void)=>void,
+    postMove?:(pos:Position)=>void
     moveFinished?:(unit:Unit)=>void
     resized?:(pos:Position)=>void
 }
@@ -37,8 +37,7 @@ export type UnitClass = {
 export type Unit = Model & {
     id:number,
     initPos:Position,
-    nextPos?:Position
-    setPos?:(pos:Position)=>void,
+    getPos?:()=>Position,
     setTargetPos?:(pos:Position)=>void
 } & UnitClass
 

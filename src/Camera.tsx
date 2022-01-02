@@ -3,6 +3,7 @@ import {  ScrollView } from 'react-native';
 import { CameraRef, MapRef, Controller } from './types'
 import { TILESIZE } from './constants'
 import useInnerWindow from './useInnerWindow'
+import Animated, { useAnimatedRef } from 'react-native-reanimated';
 
 type Props = {
     mapRef:MutableRefObject<MapRef>,
@@ -11,8 +12,8 @@ type Props = {
 }
 
 export default forwardRef<CameraRef, Props>(({mapRef, controller, children}, ref)=>{
-    const scrollRef = useRef<ScrollView>(null)
-    const subScrollRef = useRef<ScrollView>(null)
+    const scrollRef = useAnimatedRef<ScrollView>()
+    const subScrollRef = useAnimatedRef<ScrollView>()
     const window = useInnerWindow()
     const setFocusX = (x:number) => {
         const v = Math.min(Math.max(0, x - window.width * 0.5), TILESIZE * controller.getTiles().width - window.width)
