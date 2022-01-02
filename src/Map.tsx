@@ -50,8 +50,8 @@ export default forwardRef<MapRef, Props>(({unitListRef, controller}, ref)=>{
             // console.log(Math.floor(x), Math.floor(y))
             unitListRef.current.setTargetPos && unitListRef.current.setTargetPos([Math.floor(x) * TILESIZE, Math.floor(y) * TILESIZE])
         }} activeOpacity={0.9}>
-        {data.colliding({x:scrollX, y:scrollY, width:windowResize.width/TILESIZE, height:windowResize.height/TILESIZE}).map(
+        {/*data.colliding({x:scrollX, y:scrollY, width:windowResize.width/TILESIZE + 1, height:windowResize.height/TILESIZE + 1}).map(
             (item)=><ItemComponent {...item}/>
-        )}
+        )*/}
     </TouchableOpacity>)
 })

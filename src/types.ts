@@ -15,7 +15,8 @@ export type CameraRef = {
 }
 
 export type Controller = {
-    getTiles: ()=>Tiles 
+    getTiles: ()=>Tiles,
+    getUnits: ()=>Units
 }
 
 type Model = {}
@@ -26,3 +27,19 @@ export type Tiles = Model & {
     ids: number[][]
     tileRecord: Record<number, string>
 }
+
+export type UnitClass = {
+    move:(nextPos:Position, setPos:(pos:Position)=>void)=>void,
+    moveFinished?:(unit:Unit)=>void
+    resized?:(pos:Position)=>void
+}
+
+export type Unit = Model & {
+    id:number,
+    initPos:Position,
+    nextPos?:Position
+    setPos?:(pos:Position)=>void,
+    setTargetPos?:(pos:Position)=>void
+} & UnitClass
+
+export type Units = Unit[]

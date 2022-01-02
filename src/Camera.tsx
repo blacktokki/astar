@@ -16,12 +16,12 @@ export default forwardRef<CameraRef, Props>(({mapRef, controller, children}, ref
     const window = useInnerWindow()
     const setFocusX = (x:number) => {
         const v = Math.min(Math.max(0, x - window.width * 0.5), TILESIZE * controller.getTiles().width - window.width)
-        mapRef.current.setScrollX && mapRef.current?.setScrollX(v/32)
+        mapRef.current.setScrollX && mapRef.current?.setScrollX(Math.floor(v/TILESIZE))
         subScrollRef.current?.scrollTo({animated:false, x:v})
     }
     const setFocusY = (y:number) => {
         const v = Math.min(Math.max(0, y - window.height * 0.5), TILESIZE * controller.getTiles().height - window.height)
-        mapRef.current.setScrollY && mapRef.current?.setScrollY(v/32)
+        mapRef.current.setScrollY && mapRef.current?.setScrollY(Math.floor(v/TILESIZE))
         scrollRef.current?.scrollTo({animated:false, y:v})
     }
     useImperativeHandle(ref, ()=>({
