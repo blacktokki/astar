@@ -31,17 +31,17 @@ export default function useController(cameraRef:MutableRefObject<CameraRef>){
         }
     }
     const ai:UnitClass = {
-        // moveFinished:(unit)=>{
-        //     const nextPos:Position = [
-        //         Math.floor(Math.random() * tiles.current.width / 4) * TILESIZE, 
-        //         Math.floor(Math.random() * tiles.current.height / 4) * TILESIZE
-        //     ]
-        //     unit.setTargetPos && unit.setTargetPos(nextPos)
-        // }
+        moveFinished:(unit)=>{
+            const nextPos:Position = [
+                Math.floor(Math.random() * tiles.current.width / 8) * TILESIZE, 
+                Math.floor(Math.random() * tiles.current.height / 8) * TILESIZE
+            ]
+            unit.setTargetPos && unit.setTargetPos(nextPos)
+        }
     }
     const INIT_UNITS:Units = [
         {id:0, initPos:INIT_POSITION, ...player}
-    ].concat([...Array(500).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
+    ].concat([...Array(1600).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
     const units = useRef(INIT_UNITS)
     return {
         getTiles:() => tiles.current,

@@ -5,13 +5,15 @@ import { TILESIZE, SPEED_PER_STEP, MS_PER_STEP } from './constants'
 import useInnerWindow from './useInnerWindow'
 import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, useCode, call, useAnimatedReaction, cancelAnimation } from 'react-native-reanimated';
 
+const DURATION = TILESIZE/SPEED_PER_STEP * MS_PER_STEP
+
 function useMoveable(unit:UnitProps){
     const targetPos = useSharedValue(unit.initPos)
     const tx = useSharedValue(unit.initPos[0])
     const ty = useSharedValue(unit.initPos[1])
     const subtargetPos = useDerivedValue(()=>{return [tx.value, ty.value] as Position})
-    const ttx = useDerivedValue(()=>withTiming(tx.value, {duration:TILESIZE/SPEED_PER_STEP * MS_PER_STEP, easing:Easing.linear}, animCallback))
-    const tty = useDerivedValue(()=>withTiming(ty.value, {duration:TILESIZE/SPEED_PER_STEP * MS_PER_STEP, easing:Easing.linear}, animCallback))
+    const ttx = useDerivedValue(()=>withTiming(tx.value, {duration:DURATION, easing:Easing.linear}, animCallback))
+    const tty = useDerivedValue(()=>withTiming(ty.value, {duration:DURATION, easing:Easing.linear}, animCallback))
     const callback = ()=>{
         if(subtargetPos.value[0]!=targetPos.value[0] || subtargetPos.value[1] != targetPos.value[1]){
             const _pos = subtargetPos.value.map((value, index)=>{
@@ -33,9 +35,17 @@ function useMoveable(unit:UnitProps){
         callback()
     }
     let finished = 2
-    const animCallback = (isFinite:boolean) =>{
+    let isFirst = true
+    const animCallback = (isFinite?:boolean) =>{
         finished += 1
-        if (isFinite && finished==2)callback()
+        if (isFinite && finished==2){
+            if(isFirst){
+                setTimeout(callback, Math.random() * DURATION)
+                isFirst = false
+            }
+            else
+                callback()
+        }
     }
 
     const animStyle = useAnimatedStyle(() => {
@@ -49,7 +59,7 @@ function useMoveable(unit:UnitProps){
         }
         return style
     });
-    useAnimatedReaction(
+    unit.postMove && useAnimatedReaction(
         () => {
             unit.postMove && unit.postMove([ttx.value, tty.value])
         }, 
@@ -60,25 +70,25 @@ function useMoveable(unit:UnitProps){
     return [ttx, tty, targetPos, animStyle] as [Animated.SharedValue<number>, Animated.SharedValue<number> ,  Animated.SharedValue<Position>, typeof animStyle]
 }
 
-const man = <Text style={{paddingLeft:6}}>🧍</Text>
+const fish = <Text style={{paddingLeft:6}}>🐟</Text>//🧍
 
 const Unit = ({unit}:{unit:UnitProps})=>{
     const [ttx, tty, targetPos, animStyle] = useMoveable(unit)
-    const animStyleTarget = useAnimatedStyle(() => {
-        return {
-            ...StyleSheet.absoluteFillObject,
-            transform: [
-                {translateX: targetPos.value[0]},
-                {translateY: targetPos.value[1]},
-            ],
-            width:TILESIZE, height:TILESIZE, borderWidth:2, borderColor:'greenyellow'
-        };
-    });
+    // const animStyleTarget = useAnimatedStyle(() => {
+    //     return {
+    //         ...StyleSheet.absoluteFillObject,
+    //         transform: [
+    //             {translateX: targetPos.value[0]},
+    //             {translateY: targetPos.value[1]},
+    //         ],
+    //         width:TILESIZE, height:TILESIZE, borderWidth:2, borderColor:'greenyellow'
+    //     };
+    // });
     unit.resized && useEffect(()=>unit.resized?unit.resized([ttx.value, tty.value]):()=>{}, [useInnerWindow()])
     return <View>
-        <Animated.View style={{...animStyleTarget}}/>
+        {/* <Animated.View style={{...animStyleTarget}}/> */}
         <Animated.View style={{...animStyle}}>
-            {man}
+            {fish}
         </Animated.View>
     </View>
 }
