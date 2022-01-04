@@ -8,6 +8,7 @@ import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming
 const DURATION = TILESIZE/SPEED_PER_STEP * MS_PER_STEP
 
 function useMoveable(unit:UnitProps){
+    'worklet'
     const prevPos = useSharedValue(unit.initPos)
     const targetPos = useSharedValue(unit.initPos)
     const tx = useSharedValue(unit.initPos[0])
@@ -15,6 +16,7 @@ function useMoveable(unit:UnitProps){
     const tds = useSharedValue(0)
     const subtargetPos = useDerivedValue(()=>{return [tx.value, ty.value] as Position})
     const runs = useDerivedValue(()=>{
+        'worklet'
         if (tds.value == 0){
             return withTiming(0, {duration:1}, (fin)=>{
                 if(fin)callback()
@@ -51,8 +53,11 @@ function useMoveable(unit:UnitProps){
         }
     }
     unit.setTargetPos = (pos) =>{
+        tx.value = ttx.value
+        ty.value = tty.value
+        prevPos.value = [ttx.value, tty.value]
         targetPos.value = pos;
-        callback()
+        tds.value = 0;
     }
     useEffect(()=>{
         setTimeout(callback, Math.random() * 128)
@@ -60,7 +65,6 @@ function useMoveable(unit:UnitProps){
 
     const animStyle = useAnimatedStyle(() => {
         const style = {
-            ...StyleSheet.absoluteFillObject,
             transform: [
                 {translateX: ttx.value},
                 {translateY: tty.value},
@@ -76,14 +80,6 @@ function useMoveable(unit:UnitProps){
         },
         [ttx, tty]
     );
-    unit.id ==1 && useAnimatedReaction(
-        () => {
-            console.log(tds.value)
-        }, 
-        (result, previous) => {
-        },
-        [tds]
-    )
     return [ttx, tty, targetPos, animStyle] as [Animated.SharedValue<number>, Animated.SharedValue<number> ,  Animated.SharedValue<Position>, typeof animStyle]
 }
 
@@ -93,7 +89,6 @@ const Unit = ({unit}:{unit:UnitProps})=>{
     const [ttx, tty, targetPos, animStyle] = useMoveable(unit)
     // const animStyleTarget = useAnimatedStyle(() => {
     //     return {
-    //         ...StyleSheet.absoluteFillObject,
     //         transform: [
     //             {translateX: targetPos.value[0]},
     //             {translateY: targetPos.value[1]},
@@ -102,12 +97,12 @@ const Unit = ({unit}:{unit:UnitProps})=>{
     //     };
     // });
     unit.resized && useEffect(()=>unit.resized?unit.resized([ttx.value, tty.value]):()=>{}, [useInnerWindow()])
-    return <View>
-        {/* <Animated.View style={{...animStyleTarget}}/> */}
-        <Animated.View style={{...animStyle}}>
+    return <>
+        {/*<Animated.View style={[styles.unit, animStyleTarget]}/>*/}
+        {unit.id == 0 && (<Animated.View style={[styles.unit, animStyle]}>
             {fish}
-        </Animated.View>
-    </View>
+        </Animated.View>)}
+    </>
 }
 const createUnit = (unit:UnitProps)=><Unit key={unit.id} unit={unit}/>
 
@@ -120,3 +115,7 @@ export default forwardRef<UnitListRef, {controller:Controller}>(({controller}, r
         {units}
     </View>
 })
+
+const styles = StyleSheet.create({
+    unit: {position: 'absolute'}
+  });

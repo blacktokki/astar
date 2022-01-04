@@ -33,8 +33,8 @@ export default function useController(cameraRef:MutableRefObject<CameraRef>){
     const ai:UnitClass = {
         moveFinished:(unit)=>{
             const nextPos:Position = [
-                Math.floor(Math.random() * tiles.current.width / 8) * TILESIZE, 
-                Math.floor(Math.random() * tiles.current.height / 8) * TILESIZE
+                Math.floor(Math.random() * tiles.current.width / 4) * TILESIZE, 
+                Math.floor(Math.random() * tiles.current.height / 4) * TILESIZE
             ]
             unit.setTargetPos && unit.setTargetPos(nextPos)
         }
