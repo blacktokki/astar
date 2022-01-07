@@ -1,12 +1,14 @@
-import { useState, useEffect, forwardRef, useImperativeHandle, useRef, RefObject, MutableRefObject, useDebugValue } from 'react'
+import { useState, useEffect, forwardRef, useImperativeHandle, useRef, memo } from 'react'
 import { View, Text, StyleSheet } from 'react-native';
 import { Position, UnitListRef, Controller, Unit as UnitProps }from './types'
 import { TILESIZE, SPEED_PER_STEP, MS_PER_STEP } from './constants'
 import useInnerWindow from './useInnerWindow'
-import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, useCode, call, useAnimatedReaction, cancelAnimation } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, useAnimatedReaction, withSequence } from 'react-native-reanimated';
 
 const DURATION = TILESIZE/SPEED_PER_STEP * MS_PER_STEP
-
+type SerfaceData = {
+    vec:Position
+}
 function useMoveable(unit:UnitProps){
     'worklet'
     const prevPos = useSharedValue(unit.initPos)
@@ -83,8 +85,6 @@ function useMoveable(unit:UnitProps){
     return [ttx, tty, targetPos, animStyle] as [Animated.SharedValue<number>, Animated.SharedValue<number> ,  Animated.SharedValue<Position>, typeof animStyle]
 }
 
-const fish = <Text style={{paddingLeft:6}}>🐟</Text>//🧍
-
 const Unit = ({unit}:{unit:UnitProps})=>{
     const [ttx, tty, targetPos, animStyle] = useMoveable(unit)
     // const animStyleTarget = useAnimatedStyle(() => {
@@ -106,13 +106,96 @@ const Unit = ({unit}:{unit:UnitProps})=>{
 }
 const createUnit = (unit:UnitProps)=><Unit key={unit.id} unit={unit}/>
 
+
+const fish = <Text style={{paddingLeft:6}}>🐟</Text>//🧍
+
+const _SIZE = 250
+const _CNT = 5
+
+const UUnit = memo(({model}:{model:any})=>{
+    const ipos = useRef([Math.random()*_SIZE, Math.random()*_SIZE])
+    const [xx, setXx] = useState(ipos.current[0])
+    const [yy, setYy] = useState(ipos.current[1])
+    useEffect(()=>{
+        model.setXx = setXx
+        model.setYy = setYy
+    })
+    useEffect(()=>{
+        model.xx = xx
+        model.yy = yy
+    }, [xx, yy])
+    return <View style={[styles.unit, {left:xx, top:yy}]}>{fish}</View>
+})
+const Surface = ({controller, data}:{controller:Controller, data:SerfaceData}) =>{
+    const pp = useSharedValue(0)
+    const _style = useAnimatedStyle(() => {
+        return {
+            transform: [
+                {translateX: pp.value * data.vec[0]},
+                {translateY: pp.value * data.vec[1]}
+            ],
+        };
+    });
+    const distance = 100000000
+    const _models = useRef([...Array(_CNT).keys()].map(v=>({id:v} as any)))
+    const getOffset = ()=>[pp.value*data.vec[0], pp.value*data.vec[1]]
+    const fishs = useRef(_models.current.map((v, i)=><UUnit key={i} model={v}/>))
+    useEffect(()=>{
+        pp.value = withSequence(withTiming(distance,  { duration: distance * MS_PER_STEP/SPEED_PER_STEP,  easing:Easing.linear }), withTiming(0, { duration: 1 }))
+        const interval = setInterval(()=>{
+            'worklet'
+            _models.current.forEach((m)=>{
+                const tx = m.xx + pp.value*data.vec[0]
+                const ty = m.yy + pp.value*data.vec[1]
+                if (m.xx !=undefined){
+                    if(tx<0){
+                        m.setXx(_SIZE  - Math.random() * 25 - pp.value * data.vec[0])
+                        m.xx = undefined
+                    }
+                    else if(tx > _SIZE){
+                        m.setXx(0 + Math.random() * 25 - pp.value * data.vec[0])
+                        m.xx = undefined
+                    }
+                }
+                if (m.yy !=undefined){
+                    if(ty<0){
+                        m.setYy(_SIZE  - Math.random() * 25 - pp.value * data.vec[1])
+                        m.yy = undefined
+                    }
+                    else if(ty > _SIZE){
+                        m.setYy(0  + Math.random() * 25 - pp.value * data.vec[1])
+                        m.yy = undefined
+                    }
+                }
+            })
+        }, 125)
+        return ()=>clearInterval(interval)
+    }, [])
+    return <Animated.View style={[styles.unit, _style]}>
+        {fishs.current}
+    </Animated.View>
+
+}
+
 export default forwardRef<UnitListRef, {controller:Controller}>(({controller}, ref)=>{
+    const serfaceRef = useRef<SerfaceData[]>([
+        {vec:[1, 0]},
+        {vec:[-1, 0]},
+        {vec:[0, 1]},
+        {vec:[0, -1]},
+        {vec:[1, 1]},
+        {vec:[-1, -1]},
+        {vec:[-1, 1]},
+        {vec:[1, -1]}
+    ])
     useImperativeHandle(ref, ()=>({
-        setTargetPos: controller.getUnits()[0].setTargetPos
+        setTargetPos: controller.getUnits()[0].setTargetPos,
+        serfaceRef: serfaceRef
     }))
-    const units = controller.getUnits().map(createUnit)
+    // const units = controller.getUnits().map(createUnit)
     return <View style={{...StyleSheet.absoluteFillObject, width:0, height:0}}>
-        {units}
+        {serfaceRef.current.map((d, i)=><Surface key={i} controller={controller} data={d}/>)}
+        {/*units*/}
     </View>
 })
 
