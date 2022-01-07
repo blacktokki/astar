@@ -1,6 +1,6 @@
 import { MutableRefObject, useRef } from 'react';
 import { TILESIZE } from './constants';
-import { Tiles, Units, Controller, Position, CameraRef, UnitClass } from './types'
+import { Tiles, Units, Controller, Position, CameraRef, UnitInit } from './types'
 
 const DUMMY_TILECOUNT = 256
 const DUMMY_TILEIDS_COUNT = 16
@@ -20,7 +20,7 @@ const INIT_TILES:Tiles = {
 
 export default function useController(cameraRef:MutableRefObject<CameraRef>){
     const tiles = useRef(INIT_TILES)
-    const player:UnitClass = {
+    const player:UnitInit = {
         postMove:(nextPos)=>{
             cameraRef.current.setFocusX && cameraRef.current.setFocusX(nextPos[0])
             cameraRef.current.setFocusY && cameraRef.current.setFocusY(nextPos[1])
@@ -30,18 +30,17 @@ export default function useController(cameraRef:MutableRefObject<CameraRef>){
             cameraRef.current.setFocusY && cameraRef.current.setFocusY(pos[1])
         }
     }
-    const ai:UnitClass = {
+    const ai:UnitInit = {
         moveFinished:(unit)=>{
-            const nextPos:Position = [
-                Math.floor(Math.random() * tiles.current.width / 4) * TILESIZE, 
-                Math.floor(Math.random() * tiles.current.height / 4) * TILESIZE
+            unit.targetPos = [
+                Math.floor(Math.random() * tiles.current.width / 16) * TILESIZE, 
+                Math.floor(Math.random() * tiles.current.height / 16) * TILESIZE
             ]
-            unit.setTargetPos && unit.setTargetPos(nextPos)
         }
     }
     const INIT_UNITS:Units = [
         {id:0, initPos:INIT_POSITION, ...player}
-    ].concat([...Array(1600).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
+    ].concat([...Array(100).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
     const units = useRef(INIT_UNITS)
     return {
         getTiles:() => tiles.current,

@@ -1,4 +1,5 @@
 export type Position = [number, number]
+export type Vector = [number, number, number]
 
 export type UnitListRef = {
     setTargetPos?: (pos:Position)=>void
@@ -28,7 +29,7 @@ export type Tiles = Model & {
     tileRecord: Record<number, string>
 }
 
-export type UnitClass = {
+export type UnitInit = {
     postMove?:(pos:Position)=>void
     moveFinished?:(unit:Unit)=>void
     resized?:(pos:Position)=>void
@@ -37,8 +38,14 @@ export type UnitClass = {
 export type Unit = Model & {
     id:number,
     initPos:Position,
-    getPos?:()=>Position,
-    setTargetPos?:(pos:Position)=>void
-} & UnitClass
+    targetPos?:Position
+    component?:JSX.Element
+    movement?: {
+        setX: (x:number)=>void
+        setY: (y:number)=>void
+        x:number,
+        y:number
+    }
+} & UnitInit
 
 export type Units = Unit[]
