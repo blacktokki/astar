@@ -1,10 +1,13 @@
 export type Position = [number, number]
 
+export type ScrollInfo = [number, number, number, number]
+
 export type UnitListRef = {
     setTargetPos?: (pos:Position)=>void
 }
 
 export type MapRef = {
+    getScrollInfo?: ()=>ScrollInfo
     setScrollX?: (x:number)=>void
     setScrollY?: (y:number)=>void
     setMargin?: (margin:[number, number])=>void
@@ -16,7 +19,10 @@ export type CameraRef = {
 
 export type Controller = {
     getTiles: ()=>Tiles,
-    getUnits: ()=>Units
+    getUnits: ()=>Units,
+    setTargetPos: (pos:Position)=>void,
+    setScrollX: (x:number)=>void,
+    setScrollY: (x:number)=>void
 }
 
 type Model = {}
@@ -37,8 +43,13 @@ export type UnitClass = {
 export type Unit = Model & {
     id:number,
     initPos:Position,
-    getPos?:()=>Position,
-    setTargetPos?:(pos:Position)=>void
+    movement?:{
+        targetPos:Position,
+        prevPos:Position,
+        nextPos:Position
+        setTargetPos:(pos:Position)=>void
+        checkVisible:(scrollInfo:ScrollInfo)=>void
+    }
 } & UnitClass
 
 export type Units = Unit[]

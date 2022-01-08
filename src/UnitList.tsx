@@ -1,121 +1,136 @@
-import { useState, useEffect, forwardRef, useImperativeHandle, useRef, RefObject, MutableRefObject, useDebugValue } from 'react'
+import { useState, useEffect, forwardRef, useImperativeHandle, useRef, RefObject, MutableRefObject, useDebugValue, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet } from 'react-native';
-import { Position, UnitListRef, Controller, Unit as UnitProps }from './types'
+import { Position, UnitListRef, Controller, Unit as UnitProps, ScrollInfo }from './types'
 import { TILESIZE, SPEED_PER_STEP, MS_PER_STEP } from './constants'
 import useInnerWindow from './useInnerWindow'
 import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, useCode, call, useAnimatedReaction, cancelAnimation } from 'react-native-reanimated';
 
-const DURATION = TILESIZE/SPEED_PER_STEP * MS_PER_STEP
-
-function useMoveable(unit:UnitProps){
-    'worklet'
-    const prevPos = useSharedValue(unit.initPos)
-    const targetPos = useSharedValue(unit.initPos)
-    const tx = useSharedValue(unit.initPos[0])
-    const ty = useSharedValue(unit.initPos[1])
-    const tds = useSharedValue(0)
-    const subtargetPos = useDerivedValue(()=>{return [tx.value, ty.value] as Position})
-    const runs = useDerivedValue(()=>{
-        'worklet'
-        if (tds.value == 0){
-            return withTiming(0, {duration:1}, (fin)=>{
-                if(fin)callback()
-            })
-        }
-        else
-            return withTiming(1, {duration:DURATION/TILESIZE * tds.value, easing:Easing.linear}, (fin)=>{
-                if(fin){
-                    prevPos.value = subtargetPos.value
-                    tds.value = 0
-                }
-            })
-    })
-    const ttx = useDerivedValue(()=>prevPos.value[0] * (1 - runs.value) + subtargetPos.value[0] * runs.value)
-    const tty = useDerivedValue(()=>prevPos.value[1] * (1 - runs.value) + subtargetPos.value[1] * runs.value)
-    const callback = ()=>{
-        if(subtargetPos.value[0]!=targetPos.value[0] || subtargetPos.value[1] != targetPos.value[1]){
-            // const _pos = subtargetPos.value.map((value, index)=>{
-            //     const res = value - value % TILESIZE
-            //     if (value < targetPos.value[index])
-            //         return res + TILESIZE
-            //     if (value > targetPos.value[index])
-            //         return res - TILESIZE
-            //     return res
-            // }) as Position
-            // tx.value = _pos[0]
-            // ty.value = _pos[1]
-            tds.value = Math.sqrt(Math.pow(targetPos.value[0] - tx.value, 2) + Math.pow(targetPos.value[1] - ty.value, 2))
-            tx.value = targetPos.value[0]
-            ty.value = targetPos.value[1]
-        }
-        else{
-            unit.moveFinished && unit.moveFinished(unit)
-        }
-    }
-    unit.setTargetPos = (pos) =>{
-        tx.value = ttx.value
-        ty.value = tty.value
-        prevPos.value = [ttx.value, tty.value]
-        targetPos.value = pos;
-        tds.value = 0;
-    }
-    useEffect(()=>{
-        setTimeout(callback, Math.random() * 128)
-    }, [])
-
-    const animStyle = useAnimatedStyle(() => {
-        const style = {
-            transform: [
-                {translateX: ttx.value},
-                {translateY: tty.value},
-            ],
-        }
-        return style
-    });
-    unit.postMove && useAnimatedReaction(
-        () => {
-            unit.postMove && unit.postMove([ttx.value, tty.value])
-        }, 
-        (result, previous) => {
-        },
-        [ttx, tty]
-    );
-    return [ttx, tty, targetPos, animStyle] as [Animated.SharedValue<number>, Animated.SharedValue<number> ,  Animated.SharedValue<Position>, typeof animStyle]
-}
-
 const fish = <Text style={{paddingLeft:6}}>🐟</Text>//🧍
 
+
+const useTargetCursor = (targetPos:Animated.SharedValue<Position>)=>{
+    const animStyleTarget = useAnimatedStyle(() => {
+        return {
+            transform: [
+                {translateX: targetPos.value[0]},
+                {translateY: targetPos.value[1]},
+            ],
+            width:TILESIZE, height:TILESIZE, borderWidth:2, borderColor:'greenyellow'
+        };
+    });
+    return useRef(<Animated.View style={[styles.unitStyle, animStyleTarget]}/>)
+}
+
+
+const getNextPos = (currentPos:Position, targetPos:Position)=>{
+    'worklet'
+    const distanceX = Math.abs(targetPos[0] - currentPos[0])
+    const distanceY = Math.abs(targetPos[1] - currentPos[1])
+    const distance = distanceX>0 && distanceY?Math.min(distanceX, distanceY):Math.max(distanceX, distanceY)
+    return currentPos.map((value, index)=>{
+        if (value < targetPos[index])
+            return value + distance
+        if (value > targetPos[index])
+            return value - distance
+        return value
+    }) as Position
+}
+
 const Unit = ({unit}:{unit:UnitProps})=>{
-    const [ttx, tty, targetPos, animStyle] = useMoveable(unit)
-    // const animStyleTarget = useAnimatedStyle(() => {
-    //     return {
-    //         transform: [
-    //             {translateX: targetPos.value[0]},
-    //             {translateY: targetPos.value[1]},
-    //         ],
-    //         width:TILESIZE, height:TILESIZE, borderWidth:2, borderColor:'greenyellow'
-    //     };
-    // });
-    unit.resized && useEffect(()=>unit.resized?unit.resized([ttx.value, tty.value]):()=>{}, [useInnerWindow()])
+    'worklet'
+    const _styles = styles
+    const [visible, setVisible] = useState(true)
+    const runs = useSharedValue(1)
+    const livePos = useDerivedValue<Position>(()=>{
+        if (unit.movement){
+            return [
+                unit.movement.prevPos[0] * (1 - runs.value) + unit.movement.nextPos[0] * runs.value,
+                unit.movement.prevPos[1] * (1 - runs.value) + unit.movement.nextPos[1] * runs.value
+            ]
+        }
+        return unit.initPos
+    })
+    const callback = useCallback(()=>{
+        'worklet'
+        if (unit.movement){
+            if(unit.movement.nextPos[0]!=unit.movement.targetPos[0] || unit.movement.nextPos[1] != unit.movement.targetPos[1]){
+                unit.movement.prevPos = unit.movement.nextPos
+                unit.movement.nextPos = getNextPos(unit.movement.nextPos, unit.movement.targetPos)
+                const distance = Math.sqrt(Math.pow(unit.movement.nextPos[0] - unit.movement.prevPos[0], 2) + Math.pow(unit.movement.nextPos[1] - unit.movement.prevPos[1], 2))
+                runs.value = 0
+            runs.value = withTiming(1, {duration:distance * MS_PER_STEP / SPEED_PER_STEP, easing:Easing.linear},(fin)=>{if(fin)callback()})
+            }
+            else{
+                unit.moveFinished && unit.moveFinished(unit)
+            }
+        }
+    }, [unit])
+    useEffect(()=>{
+        unit.movement = {
+            targetPos: unit.initPos,
+            prevPos: unit.initPos,
+            nextPos: unit.initPos,
+            setTargetPos: (pos) =>{
+                if(unit.movement){
+                    unit.movement.prevPos = livePos.value
+                    unit.movement.nextPos = livePos.value
+                    unit.movement.targetPos = pos
+                    callback()
+                }
+            },
+            checkVisible:(scrollInfo:ScrollInfo)=>{}
+        }
+        callback()
+    }, [])
+    useEffect(()=>{
+        if(unit.movement)
+            unit.movement.checkVisible = (scrollInfo)=>{
+                'worklet'
+                const v = scrollInfo[0] < livePos.value[0] && 
+                scrollInfo[2] > livePos.value[0] && 
+                scrollInfo[1] < livePos.value[1] && 
+                scrollInfo[3] > livePos.value[1]
+                if(v != visible)setVisible(v)
+            }
+    }, [visible])
+
+    const animStyle = useAnimatedStyle(() => {
+        return {
+            transform: [
+                {translateX: visible?livePos.value[0]:-1000},
+                {translateY: visible?livePos.value[1]:-1000},
+            ],
+        }
+    }, [visible]);
+
+    unit.postMove && useAnimatedReaction(
+        () => {unit.postMove && unit.postMove(livePos.value)}, 
+        (result, previous) => {},
+        [livePos]
+    );
+    // const cursor = useTargetCursor(targetPos)
+    unit.resized && useEffect(()=>unit.resized?unit.resized(livePos.value):()=>{}, [useInnerWindow()])
     return <>
-        {/*<Animated.View style={[styles.unit, animStyleTarget]}/>*/}
-        {unit.id == 0 && (<Animated.View style={[styles.unit, animStyle]}>
+        {/*cursor.current*/}
+        {<Animated.View style={[_styles.unitStyle, animStyle]}>
             {fish}
-        </Animated.View>)}
+        </Animated.View>}
     </>
 }
 const createUnit = (unit:UnitProps)=><Unit key={unit.id} unit={unit}/>
 
 export default forwardRef<UnitListRef, {controller:Controller}>(({controller}, ref)=>{
     useImperativeHandle(ref, ()=>({
-        setTargetPos: controller.getUnits()[0].setTargetPos
+        setTargetPos: (pos)=>{
+            controller.getUnits()[0].movement?.setTargetPos(pos)
+        },
     }))
-    const units = controller.getUnits().map(createUnit)
+    const units = useMemo(()=>controller.getUnits().map(createUnit), [controller])
     return <View style={{...StyleSheet.absoluteFillObject, width:0, height:0}}>
         {units}
     </View>
 })
 
 const styles = StyleSheet.create({
-    unit: {position: 'absolute'}
+    unitStyle: {position: 'absolute'}
   });

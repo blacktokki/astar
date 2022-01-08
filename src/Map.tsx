@@ -1,6 +1,6 @@
-import { MutableRefObject, useMemo, forwardRef, memo, useState, useImperativeHandle } from 'react'
+import { useMemo, forwardRef, memo, useState, useImperativeHandle } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Position, UnitListRef, MapRef, Controller, Tiles } from './types'
+import { Position, MapRef, Controller, Tiles } from './types'
 import { TILESIZE} from './constants'
 import useInnerWindow from './useInnerWindow'
 import Quadtree from 'quadtree-lib'
@@ -18,18 +18,19 @@ const ItemComponent = memo((item:Item)=>{
     return <View style={{...StyleSheet.absoluteFillObject, left:item.pos[0], top:item.pos[1], width:TILESIZE, height:TILESIZE, backgroundColor:item.record}}/>
 })
 
-type Props = {
-    unitListRef:MutableRefObject<UnitListRef>
-    controller:Controller
-}
-
-export default forwardRef<MapRef, Props>(({unitListRef, controller}, ref)=>{
+export default forwardRef<MapRef, {controller:Controller}>(({controller}, ref)=>{
     const [scrollX, setScrollX] = useState<number>(0)
     const [scrollY, setScrollY] = useState<number>(0)
     const [margin, setMargin] = useState<[number, number]>([0, 0])
     const window = useInnerWindow()
     const windowResize = useMemo(()=>({width:window.width, height: window.height}) ,[window])
     useImperativeHandle(ref, ()=>({
+        getScrollInfo: ()=>{return [
+            scrollX * TILESIZE, 
+            scrollY * TILESIZE, 
+            scrollX * TILESIZE + windowResize.width + TILESIZE, 
+            scrollY * TILESIZE + windowResize.height + TILESIZE
+        ]},
         setScrollX,
         setScrollY,
         setMargin
@@ -48,10 +49,10 @@ export default forwardRef<MapRef, Props>(({unitListRef, controller}, ref)=>{
             const x = scrollX + (e.nativeEvent.pageX - margin[0]) / TILESIZE
             const y = scrollY + (e.nativeEvent.pageY - margin[1]) / TILESIZE
             // console.log(Math.floor(x), Math.floor(y))
-            unitListRef.current.setTargetPos && unitListRef.current.setTargetPos([Math.floor(x) * TILESIZE, Math.floor(y) * TILESIZE])
+            controller.setTargetPos([Math.floor(x) * TILESIZE, Math.floor(y) * TILESIZE])
         }} activeOpacity={0.9}>
-        {/* {data.colliding({x:scrollX, y:scrollY, width:windowResize.width/TILESIZE + 1, height:windowResize.height/TILESIZE + 1}).map(
+        {data.colliding({x:scrollX , y:scrollY, width:windowResize.width/TILESIZE + 1, height:windowResize.height/TILESIZE + 1}).map(
             (item)=><ItemComponent {...item}/>
-        )} */}
+        )}
     </TouchableOpacity>)
 })
