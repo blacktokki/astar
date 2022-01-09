@@ -5,135 +5,46 @@ import { TILESIZE, SPEED_PER_STEP, MS_PER_STEP, VECTORS } from './constants'
 import useInnerWindow from './useInnerWindow'
 import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, useAnimatedReaction, withSequence } from 'react-native-reanimated';
 
-const DURATION = TILESIZE/SPEED_PER_STEP * MS_PER_STEP
+type ShareState = {
+    x:number,
+    y:number,
+    visible:boolean
+}
+
+type UunitData = {
+    shareState?:Animated.SharedValue<ShareState>
+}
+
 type SurfaceData = {
     vec:Vector
-    units?:UnitProps[],
-    setUnits?:(units:UnitProps[])=>void, 
-    getOffset?:()=>Position
+    getPos?:(index:number)=>Position
+    setPos?:(pos:Position, index:number)=>void, 
+    setVisible?:(visible:boolean, index:number)=>void,
 }
-function useMoveable(unit:UnitProps){
-    'worklet'
-    const prevPos = useSharedValue(unit.initPos)
-    const targetPos = useSharedValue(unit.initPos)
-    const tx = useSharedValue(unit.initPos[0])
-    const ty = useSharedValue(unit.initPos[1])
-    const tds = useSharedValue(0)
-    const subtargetPos = useDerivedValue(()=>{return [tx.value, ty.value] as Position})
-    const runs = useDerivedValue(()=>{
-        'worklet'
-        if (tds.value == 0){
-            return withTiming(0, {duration:1}, (fin)=>{
-                if(fin)callback()
-            })
-        }
-        else
-            return withTiming(1, {duration:DURATION/TILESIZE * tds.value, easing:Easing.linear}, (fin)=>{
-                if(fin){
-                    prevPos.value = subtargetPos.value
-                    tds.value = 0
-                }
-            })
-    })
-    const ttx = useDerivedValue(()=>prevPos.value[0] * (1 - runs.value) + subtargetPos.value[0] * runs.value)
-    const tty = useDerivedValue(()=>prevPos.value[1] * (1 - runs.value) + subtargetPos.value[1] * runs.value)
-    const callback = ()=>{
-        if(subtargetPos.value[0]!=targetPos.value[0] || subtargetPos.value[1] != targetPos.value[1]){
-            // const _pos = subtargetPos.value.map((value, index)=>{
-            //     const res = value - value % TILESIZE
-            //     if (value < targetPos.value[index])
-            //         return res + TILESIZE
-            //     if (value > targetPos.value[index])
-            //         return res - TILESIZE
-            //     return res
-            // }) as Position
-            // tx.value = _pos[0]
-            // ty.value = _pos[1]
-            tds.value = Math.sqrt(Math.pow(targetPos.value[0] - tx.value, 2) + Math.pow(targetPos.value[1] - ty.value, 2))
-            tx.value = targetPos.value[0]
-            ty.value = targetPos.value[1]
-        }
-        else{
-            unit.moveFinished && unit.moveFinished(unit)
-        }
-    }
-    // unit.setTargetPos = (pos) =>{
-    //     tx.value = ttx.value
-    //     ty.value = tty.value
-    //     prevPos.value = [ttx.value, tty.value]
-    //     targetPos.value = pos;
-    //     tds.value = 0;
-    // }
-    useEffect(()=>{
-        setTimeout(callback, Math.random() * 128)
-    }, [])
-
-    const animStyle = useAnimatedStyle(() => {
-        const style = {
-            transform: [
-                {translateX: ttx.value},
-                {translateY: tty.value},
-            ],
-        }
-        return style
-    });
-    unit.postMove && useAnimatedReaction(
-        () => {
-            unit.postMove && unit.postMove([ttx.value, tty.value])
-        }, 
-        (result, previous) => {
-        },
-        [ttx, tty]
-    );
-    return [ttx, tty, targetPos, animStyle] as [Animated.SharedValue<number>, Animated.SharedValue<number> ,  Animated.SharedValue<Position>, typeof animStyle]
-}
-
-const Unit = ({unit}:{unit:UnitProps})=>{
-    const [ttx, tty, targetPos, animStyle] = useMoveable(unit)
-    // const animStyleTarget = useAnimatedStyle(() => {
-    //     return {
-    //         transform: [
-    //             {translateX: targetPos.value[0]},
-    //             {translateY: targetPos.value[1]},
-    //         ],
-    //         width:TILESIZE, height:TILESIZE, borderWidth:2, borderColor:'greenyellow'
-    //     };
-    // });
-    unit.resized && useEffect(()=>unit.resized?unit.resized([ttx.value, tty.value]):()=>{}, [useInnerWindow()])
-    return <>
-        {/*<Animated.View style={[styles.unit, animStyleTarget]}/>*/}
-        {unit.id == 0 && (<Animated.View style={[styles.unit, animStyle]}>
-            {fish}
-        </Animated.View>)}
-    </>
-}
-const createUnit = (unit:UnitProps)=><Unit key={unit.id} unit={unit}/>
-
 
 const fish = <Text style={{paddingLeft:6}}>🐟</Text>//🧍
 
-const _SIZE = 250
-const _CNT = 5
+const distance = 100000000
+const INIT_POSITION:Position = [-distance, -distance]
 
-const UUnit = memo(({unit}:{unit:UnitProps})=>{
-    const [x, setX] = useState(unit.initPos[0])
-    const [y, setY] = useState(unit.initPos[1])
+const UUnit = ({data}:{data:UunitData})=>{
+    const shareState = useSharedValue({x:INIT_POSITION[0], y:INIT_POSITION[1], visible:true})
     useEffect(()=>{
-        console.log('@')
-        unit.movement = {setX, setY, x, y}
+        data.shareState = shareState
     }, [])
-    useEffect(()=>{
-        if(unit.movement){
-            unit.movement.x = x
-            unit.movement.y = y
-            }
-    }, [x, y])
-    return <View style={[styles.unit, {left:x, top:y}]}>{fish}</View>
-}, (prevProps, nextProps)=>{
-    console.log(prevProps, nextProps, prevProps==nextProps)
-    return prevProps.unit == nextProps.unit
-})
-const Surface = ({data}:{ data:SurfaceData}) =>{
+    const _style = useAnimatedStyle(()=>{
+        return  {
+            //overflow:'hidden',
+            //width:shareState.value.visible?40:0,
+            //height:shareState.value.visible?40:0,
+            transform:[{translateX:shareState.value.x},{translateY:shareState.value.y}]
+        }
+    }, [])
+    return <Animated.View style={[styles.unit, _style]}>{fish}</Animated.View>
+}
+const MAX_ELEMENT = 500
+
+const Surface = ({data}:{data:SurfaceData}) =>{
     const pp = useSharedValue(0)
     const _style = useAnimatedStyle(() => {
         return {
@@ -143,22 +54,48 @@ const Surface = ({data}:{ data:SurfaceData}) =>{
             ],
         };
     });
-    const distance = 100000000
-    const [units, setUnits] = useState<UnitProps[]>([])
     useEffect(()=>{
-        data.getOffset = () => [pp.value*data.vec[0], pp.value*data.vec[1]]
-        data.setUnits = setUnits
-        data.units = units
-        pp.value = withSequence(withTiming(distance,  { duration: distance * MS_PER_STEP/SPEED_PER_STEP * 10,  easing:Easing.linear }), withTiming(0, { duration: 1 }))
+        data.getPos = (index)=>{
+            'worklet'
+            const _state = uunitData.current[index].shareState
+            if(_state){
+                return [pp.value*data.vec[0] + _state.value.x,pp.value*data.vec[1] + _state.value.y]
+            }
+            return INIT_POSITION
+        },
+        data.setPos = (pos, index)=>{
+            'worklet'
+            const _state = uunitData.current[index].shareState
+            if(_state){
+                _state.value = {
+                    x:pos[0] - pp.value*data.vec[0],
+                    y:pos[1] - pp.value*data.vec[1],
+                    visible:_state.value.visible
+                }
+            }
+        }
+        data.setVisible = (visible, index)=>{
+            'worklet'
+            const _state = uunitData.current[index].shareState
+            if(_state){
+                _state.value = {
+                    x:_state.value.x,
+                    y:_state.value.y,
+                    visible:visible
+                }
+            }
+        }
+        pp.value = withSequence(withTiming(distance,  { duration: distance * MS_PER_STEP/SPEED_PER_STEP,  easing:Easing.linear }), withTiming(0, { duration: 1 }))
     }, [])
-    useEffect(()=>{data.units = units}, [units])
+    const uunitData = useRef([...Array(MAX_ELEMENT)].map((v)=>({} as UunitData)))
+    const uunit = useRef(uunitData.current.map((v,k)=><UUnit key={k} data={v}/>))
     return <Animated.View style={[styles.unit, _style]}>
-        {units.map((v)=>v.component)}
+        {uunit.current}
     </Animated.View>
 
 }
 
-const vecToNum = (v:Vector)=>  4 + v[0] + v[1] * 3 + v[2] * 9
+// const vecToNum = (v:Vector)=>  4 + v[0] + v[1] * 3 + v[2] * 9
 
 export default forwardRef<UnitListRef, {controller:Controller}>(({controller}, ref)=>{
     const surfaceRef = useRef<SurfaceData[]>(VECTORS.map(v=>({vec:v})))
@@ -178,49 +115,39 @@ export default forwardRef<UnitListRef, {controller:Controller}>(({controller}, r
         },
     }))
     useEffect(()=>{
-        const initSurface = surfaceRef.current[vecToNum([0, 0, 0])]
-        const initUnits = controller.getUnits()
-        initSurface.setUnits && initSurface.setUnits(initUnits)
-        initUnits.forEach(unit=>{
-            unit.component = <UUnit key={unit.id} unit={unit}/>
-        })
-        const cacheUnits:(UnitProps)[] = new Array(10000)
+        let prevLen = surfaceRef.current.map(()=>0)
         const interval = setInterval(()=>{
-            let cacheLen = 0
-            const newUnits = surfaceRef.current.map((surface)=>{
-                if(surface.getOffset && surface.units){
-                    const offset = surface.getOffset()
-                    return surface.units.filter((unit)=>{
-                        if (1){
-                            cacheUnits[cacheLen] = unit
-                            cacheLen += 1
-                            return false
-                        }
-                        return true
-                    })
-                }
-                return []
-            })
-            for(let i = 0;i<cacheLen;i++){
-                const unit = cacheUnits[i]
-                const idx = Math.floor(Math.random()* VECTORS.length)
-                const getOffset = surfaceRef.current[idx].getOffset
-                if (unit.movement && getOffset){
-                    const offset = getOffset()
-                    //unit.movement.setX(offset[0])
-                    //unit.movement.setY(offset[1])
-                }
-                newUnits[Math.floor(Math.random()* VECTORS.length)].push(unit)
-            }
+            let cacheLen = surfaceRef.current.map(()=>0)
             const d = new Date()
-            surfaceRef.current.forEach((surface, i)=>{
-                surface.setUnits && surface.setUnits(newUnits[i])
+            controller.getUnits().map((unit)=>{
+                let pos = unit.initPos
+                if(unit.movement){
+                    const fromSurface = surfaceRef.current[unit.movement.vecIdx]
+                    pos = fromSurface.getPos?fromSurface.getPos(unit.movement.idx):pos
+                }
+                return {unit, pos}
+            }).forEach(({unit, pos})=>{
+                const idx = Math.floor(Math.random()* VECTORS.length)
+                const surface = surfaceRef.current[idx]
+                surface.setPos && surface.setPos(pos, cacheLen[idx])
+                unit.movement = {
+                    vecIdx:idx,
+                    idx:cacheLen[idx]
+                }
+                cacheLen[idx]++
             })
-            console.log('@@@', new Date().valueOf() - d.valueOf())
-        }, 125)
+            surfaceRef.current.forEach((surface, i)=>{
+                let t = cacheLen[i]
+                while(t < prevLen[i]){
+                    surface.setPos && surface.setPos(INIT_POSITION, t)
+                    t++
+                }
+            })
+            prevLen = cacheLen
+            console.log('@@@@', new Date().valueOf() - d.valueOf())
+        }, 1000)
         return ()=>clearInterval(interval)
     }, [])
-    // const units = controller.getUnits().map(createUnit)
     return <View style={{...StyleSheet.absoluteFillObject, width:0, height:0}}>
         {surfaceRef.current.map((d, i)=><Surface key={i} data={d}/>)}
     </View>

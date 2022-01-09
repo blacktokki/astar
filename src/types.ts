@@ -39,12 +39,9 @@ export type Unit = Model & {
     id:number,
     initPos:Position,
     targetPos?:Position
-    component?:JSX.Element
     movement?: {
-        setX: (x:number)=>void
-        setY: (y:number)=>void
-        x:number,
-        y:number
+     vecIdx:number,
+     idx:number   
     }
 } & UnitInit
 

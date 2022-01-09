@@ -4,7 +4,7 @@ import { Tiles, Units, Controller, Position, CameraRef, UnitInit } from './types
 
 const DUMMY_TILECOUNT = 256
 const DUMMY_TILEIDS_COUNT = 16
-const INIT_POSITION:Position = [4 * TILESIZE, 4 * TILESIZE]
+const INIT_POSITION:Position = [8 * TILESIZE, 8 * TILESIZE]
 
 const INIT_TILES:Tiles = {
     width: DUMMY_TILECOUNT,
@@ -39,8 +39,8 @@ export default function useController(cameraRef:MutableRefObject<CameraRef>){
         }
     }
     const INIT_UNITS:Units = [
-        {id:0, initPos:INIT_POSITION, ...player}
-    ].concat([...Array(100).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
+        {id:0, initPos:INIT_POSITION, ...ai}
+    ].concat([...Array(999).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
     const units = useRef(INIT_UNITS)
     return {
         getTiles:() => tiles.current,
