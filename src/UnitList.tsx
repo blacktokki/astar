@@ -1,9 +1,9 @@
-import { useState, useEffect, forwardRef, useImperativeHandle, useRef, memo, useMemo } from 'react'
+import { useEffect, forwardRef, useImperativeHandle, useRef, memo, useMemo, useState } from 'react'
 import { View, Text, StyleSheet } from 'react-native';
 import { Position, UnitListRef, Controller, Unit as UnitProps, Vector }from './types'
-import { TILESIZE, SPEED_PER_STEP, MS_PER_STEP, VECTORS } from './constants'
-import useInnerWindow from './useInnerWindow'
-import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, useAnimatedReaction, withSequence } from 'react-native-reanimated';
+import { TILESIZE, SPEED_PER_MS, VECTORS } from './constants'
+import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, withSequence } from 'react-native-reanimated';
+import Heap from 'heap';
 
 type ShareState = {
     x:number,
@@ -11,24 +11,30 @@ type ShareState = {
     visible:boolean
 }
 
-type UunitData = {
+type MoveableData = {
     shareState?:Animated.SharedValue<ShareState>
+    initShareState:ShareState
 }
 
 type SurfaceData = {
     vec:Vector
     getPos?:(index:number)=>Position
-    setPos?:(pos:Position, index:number)=>void, 
-    setVisible?:(visible:boolean, index:number)=>void,
+    setHide?:(index:number|undefined)=>void,
+    popEmptyIdx?:()=>(number|undefined)
+    setPos?:(index:number, pos:Position, distance:number, unit:UnitProps)=>void,
+    popPos?:()=>(UnitProps|undefined)
+    resize?:()=>void
 }
 
-const fish = <Text style={{paddingLeft:6}}>🐟</Text>//🧍
+const fish = <Text style={{paddingLeft:6, color:'rgba(0,0,0, 0.2)'}}>🐡</Text>//🧍
 
-const distance = 100000000
-const INIT_POSITION:Position = [-distance, -distance]
+const MAX_DISTANCE = 100000000
+const INIT_POSITION:Position = [-MAX_DISTANCE, -MAX_DISTANCE]
+const BATCH_ELEMENT = 200
+const MAX_CACHE = 200
 
-const UUnit = ({data}:{data:UunitData})=>{
-    const shareState = useSharedValue({x:INIT_POSITION[0], y:INIT_POSITION[1], visible:true})
+const Moveable = memo(({data}:{data:MoveableData})=>{
+    const shareState = useSharedValue(data.initShareState)
     useEffect(()=>{
         data.shareState = shareState
     }, [])
@@ -41,111 +47,192 @@ const UUnit = ({data}:{data:UunitData})=>{
         }
     }, [])
     return <Animated.View style={[styles.unit, _style]}>{fish}</Animated.View>
-}
-const MAX_ELEMENT = 500
+})
 
 const Surface = ({data}:{data:SurfaceData}) =>{
-    const pp = useSharedValue(0)
+    const timing = useSharedValue(0)
     const _style = useAnimatedStyle(() => {
         return {
             transform: [
-                {translateX: pp.value * data.vec[0]},
-                {translateY: pp.value * data.vec[1]}
+                {translateX: timing.value * data.vec[0]},
+                {translateY: timing.value * data.vec[1]}
             ],
         };
     });
+    const moveableData = useRef([...Array(BATCH_ELEMENT)].map((v)=>({initShareState:{x:INIT_POSITION[0], y:INIT_POSITION[1], visible:false}} as MoveableData)))
+    const [moveable, setMoveable] = useState(moveableData.current.map((v, k)=><Moveable key={k} data={v}/>))
+    const heap = useRef(new Heap<{pr:number, unit:UnitProps}>((a, b)=>(a.pr - b.pr)))
     useEffect(()=>{
+        let emptyStack:(number|undefined)[] = [...Array(BATCH_ELEMENT).keys()]
+        let emptyIdx = 0
+        data.popEmptyIdx = ()=>{
+            if (emptyIdx == moveableData.current.length){
+                moveableData.current = moveableData.current.concat([...Array(BATCH_ELEMENT)].map((v)=>({initShareState:{x:INIT_POSITION[0], y:INIT_POSITION[1], visible:false}})))
+                emptyStack = emptyStack.concat([...Array(BATCH_ELEMENT).keys()].map((v)=>BATCH_ELEMENT + v))
+            }
+            return emptyStack[emptyIdx++]
+        },
         data.getPos = (index)=>{
             'worklet'
-            const _state = uunitData.current[index].shareState
+            const _state = moveableData.current[index].shareState
             if(_state){
-                return [pp.value*data.vec[0] + _state.value.x,pp.value*data.vec[1] + _state.value.y]
+                return [timing.value*data.vec[0] + _state.value.x, timing.value*data.vec[1] + _state.value.y]
             }
-            return INIT_POSITION
+            else{
+                const _init_state = moveableData.current[index].initShareState
+                return [timing.value*data.vec[0] + _init_state.x, timing.value *data.vec[1] + _init_state.y]
+            }
         },
-        data.setPos = (pos, index)=>{
+        data.setPos = (index, pos, distance, unit)=>{
             'worklet'
-            const _state = uunitData.current[index].shareState
+            const _state = moveableData.current[index].shareState
             if(_state){
                 _state.value = {
-                    x:pos[0] - pp.value*data.vec[0],
-                    y:pos[1] - pp.value*data.vec[1],
-                    visible:_state.value.visible
+                    x:pos[0] - timing.value*data.vec[0],
+                    y:pos[1] - timing.value*data.vec[1],
+                    visible:true
                 }
             }
+            else{
+                moveableData.current[index].initShareState = {
+                    x:pos[0] - timing.value*data.vec[0],
+                    y:pos[1] - timing.value*data.vec[1],
+                    visible:true
+                }
+            }
+            heap.current.push({pr:timing.value + distance, unit})
         }
-        data.setVisible = (visible, index)=>{
+        data.setHide = (index)=>{
             'worklet'
-            const _state = uunitData.current[index].shareState
+            if (index==undefined)
+                return
+            const _state = moveableData.current[index].shareState
             if(_state){
                 _state.value = {
-                    x:_state.value.x,
-                    y:_state.value.y,
-                    visible:visible
+                    x:INIT_POSITION[0],
+                    y:INIT_POSITION[1],
+                    visible:false
                 }
             }
+            else{
+                moveableData.current[index].initShareState = {
+                    x:INIT_POSITION[0],
+                    y:INIT_POSITION[1],
+                    visible:false
+                }
+            }
+            emptyStack[--emptyIdx] = index
+        },
+        data.popPos = ()=>{
+            if (heap.current.size() && heap.current.peek().pr <= timing.value)
+                return heap.current.pop().unit
+            return undefined
         }
-        pp.value = withSequence(withTiming(distance,  { duration: distance * MS_PER_STEP/SPEED_PER_STEP,  easing:Easing.linear }), withTiming(0, { duration: 1 }))
+        timing.value = withSequence(withTiming(MAX_DISTANCE,  { duration: MAX_DISTANCE/SPEED_PER_MS,  easing:Easing.linear }), withTiming(0, { duration: 1 }))
+        // const it = setInterval(()=>{
+        //     console.log(data.vec, emptyIdx, moveableData.current.length)
+        // }, 1000)
+        // return ()=>clearInterval(it )
     }, [])
-    const uunitData = useRef([...Array(MAX_ELEMENT)].map((v)=>({} as UunitData)))
-    const uunit = useRef(uunitData.current.map((v,k)=><UUnit key={k} data={v}/>))
+    useEffect(()=>{
+        data.resize = async()=>{
+            if(moveable.length < moveableData.current.length){
+                console.log(data.vec, moveable.length, moveableData.current.length)
+                setMoveable(moveable.concat([...Array(BATCH_ELEMENT).keys()].map((v)=>{
+                    return <Moveable key={moveable.length + v} data={moveableData.current[moveable.length + v]}/>})))
+            }
+        }
+    },[moveable])
     return <Animated.View style={[styles.unit, _style]}>
-        {uunit.current}
+        {moveable}
     </Animated.View>
 
 }
 
-// const vecToNum = (v:Vector)=>  4 + v[0] + v[1] * 3 + v[2] * 9
+const getNextDisVec = (currentPos:Position, targetPos:Position)=>{
+    const distanceX = Math.abs(targetPos[0] - currentPos[0])
+    const distanceY = Math.abs(targetPos[1] - currentPos[1])
+    const distance = distanceX>0 && distanceY>0?Math.min(distanceX, distanceY):Math.max(distanceX, distanceY)
+    const vec = currentPos.map((value, index)=>{
+        if (value < targetPos[index])
+            return 1
+        if (value > targetPos[index])
+            return -1
+        return 0
+    })
+    return [distance, vec] as [number, Position]
+}
+
+const finished = (currentPos:Position, unit:UnitProps)=>{
+    if(unit.targetPos && currentPos[0] == unit.targetPos[0] && currentPos[1] == unit.targetPos[1] && unit.moveFinished)
+        unit.moveFinished(unit)
+}
+
 
 export default forwardRef<UnitListRef, {controller:Controller}>(({controller}, ref)=>{
     const surfaceRef = useRef<SurfaceData[]>(VECTORS.map(v=>({vec:v})))
-    // const move = (unit:UnitProps)=>{
-    //     if (unit.movePattern){
-    //         unit.vec = [0, 0, 0]
-            
-    //         if(unit.targetPos)
-    //             unit.vec = unit.movePattern(unit.targetPos)
-    //         const surface = surfaceRef.current[vecToNum(unit.vec)]
-    //             surface.add && surface.add(unit)
-    //     }
-    // }
     useImperativeHandle(ref, ()=>({
         setTargetPos: (pos)=>{
             controller.getUnits()[0].targetPos = pos
         },
     }))
-    useEffect(()=>{
-        let prevLen = surfaceRef.current.map(()=>0)
-        const interval = setInterval(()=>{
-            let cacheLen = surfaceRef.current.map(()=>0)
-            const d = new Date()
-            controller.getUnits().map((unit)=>{
-                let pos = unit.initPos
-                if(unit.movement){
-                    const fromSurface = surfaceRef.current[unit.movement.vecIdx]
-                    pos = fromSurface.getPos?fromSurface.getPos(unit.movement.idx):pos
-                }
-                return {unit, pos}
-            }).forEach(({unit, pos})=>{
-                const idx = Math.floor(Math.random()* VECTORS.length)
-                const surface = surfaceRef.current[idx]
-                surface.setPos && surface.setPos(pos, cacheLen[idx])
+    const getPos = (unit:UnitProps)=>{
+        const pos = unit.nextPos || unit.initPos
+        let hide = ()=>{finished(unit.initPos, unit)}
+        if(unit.movement){
+            const fromSurface = surfaceRef.current[unit.movement.vecIdx]
+            // pos = fromSurface.getPos?fromSurface.getPos(unit.movement.idx):pos
+            hide = ()=>{
+                fromSurface.setHide && unit.movement && fromSurface.setHide(unit.movement.idx)
+                finished(pos, unit)
+            }
+        }
+        return {unit, pos, hide}
+    }
+    const setPos = ({unit, pos, hide}:{unit:UnitProps, pos:Position, hide:()=>void})=>{
+        const [dist, vec] = getNextDisVec(pos, unit.targetPos || pos)
+        const idx = 4 + vec[0] + vec[1] * 3
+        unit.nextPos = [pos[0] + dist * vec[0], pos[1] + dist * vec[1]]
+        const surface = surfaceRef.current[idx]
+        if (surface.popEmptyIdx){
+            const iidx = surface.popEmptyIdx()
+            if (iidx!=undefined){
+                hide && hide()
+                surface.setPos && surface.setPos(iidx, pos, dist, unit)
                 unit.movement = {
                     vecIdx:idx,
-                    idx:cacheLen[idx]
+                    idx:iidx
                 }
-                cacheLen[idx]++
-            })
-            surfaceRef.current.forEach((surface, i)=>{
-                let t = cacheLen[i]
-                while(t < prevLen[i]){
-                    surface.setPos && surface.setPos(INIT_POSITION, t)
-                    t++
+            }
+        }
+    }
+    useEffect(()=>{
+        controller.getUnits().map((unit)=>{
+            if (unit.movement == undefined && unit.moveFinished)
+                unit.moveFinished(unit)
+            return getPos(unit)
+        }).forEach(setPos)
+        const cacheUnits:{unit:UnitProps, pos:Position, hide:()=>void}[] = new Array(MAX_CACHE)
+        const interval = setInterval(()=>{
+            let cacheLen = 0
+            surfaceRef.current.forEach((surface)=>{
+                if (cacheLen == MAX_CACHE)
+                    return
+                while(surface.popPos && cacheLen<MAX_CACHE){
+                    const unit = surface.popPos()
+                    if (unit == undefined)
+                        break
+                    cacheUnits[cacheLen] = getPos(unit)
+                    cacheLen++
                 }
             })
-            prevLen = cacheLen
-            console.log('@@@@', new Date().valueOf() - d.valueOf())
-        }, 1000)
+            for(let i=0;i<cacheLen;i++){
+                setPos(cacheUnits[i])
+            }
+            surfaceRef.current.forEach((surface)=>{
+                surface.resize && surface.resize()
+            })
+        }, 100)
         return ()=>clearInterval(interval)
     }, [])
     return <View style={{...StyleSheet.absoluteFillObject, width:0, height:0}}>

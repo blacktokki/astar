@@ -11,17 +11,19 @@
   "dependencies": {
     "expo": "~44.0.0",
     "expo-status-bar": "~1.2.0",
+    "heap": "^0.2.7",
     "quadtree-lib": "^1.0.9",
     "react": "17.0.1",
     "react-dom": "17.0.1",
     "react-native": "0.64.3",
-    "react-native-web": "0.17.1",
-    "react-native-reanimated": "~2.3.0"
+    "react-native-reanimated": "~2.3.0",
+    "react-native-web": "0.17.1"
   },
   "devDependencies": {
     "@babel/core": "^7.12.9",
     "@expo/electron-adapter": "0.0.55",
     "@expo/webpack-config": "^0.13.1",
+    "@types/heap": "^0.2.29",
     "@types/react": "~17.0.21",
     "@types/react-native": "~0.64.12",
     "electron": "^11.5.0",

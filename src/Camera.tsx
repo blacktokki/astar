@@ -6,23 +6,22 @@ import useInnerWindow from './useInnerWindow'
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 
 type Props = {
-    mapRef:MutableRefObject<MapRef>,
     controller:Controller,
     children: ReactNode
 }
 
-export default forwardRef<CameraRef, Props>(({mapRef, controller, children}, ref)=>{
+export default forwardRef<CameraRef, Props>(({controller, children}, ref)=>{
     const scrollRef = useAnimatedRef<ScrollView>()
     const subScrollRef = useAnimatedRef<ScrollView>()
     const window = useInnerWindow()
     const setFocusX = (x:number) => {
         const v = Math.min(Math.max(0, x - window.width * 0.5), TILESIZE * controller.getTiles().width - window.width)
-        mapRef.current.setScrollX && mapRef.current?.setScrollX(Math.floor(v/TILESIZE))
+        controller.setScrollX(Math.floor(v/TILESIZE))
         subScrollRef.current?.scrollTo({animated:false, x:v})
     }
     const setFocusY = (y:number) => {
         const v = Math.min(Math.max(0, y - window.height * 0.5), TILESIZE * controller.getTiles().height - window.height)
-        mapRef.current.setScrollY && mapRef.current?.setScrollY(Math.floor(v/TILESIZE))
+        controller.setScrollY(Math.floor(v/TILESIZE))
         scrollRef.current?.scrollTo({animated:false, y:v})
     }
     useImperativeHandle(ref, ()=>({

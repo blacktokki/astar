@@ -18,12 +18,7 @@ const ItemComponent = memo((item:Item)=>{
     return <View style={{...StyleSheet.absoluteFillObject, left:item.pos[0], top:item.pos[1], width:TILESIZE, height:TILESIZE, backgroundColor:item.record}}/>
 })
 
-type Props = {
-    unitListRef:MutableRefObject<UnitListRef>
-    controller:Controller
-}
-
-export default forwardRef<MapRef, Props>(({unitListRef, controller}, ref)=>{
+export default forwardRef<MapRef, {controller:Controller}>(({controller}, ref)=>{
     const [scrollX, setScrollX] = useState<number>(0)
     const [scrollY, setScrollY] = useState<number>(0)
     const [margin, setMargin] = useState<[number, number]>([0, 0])
@@ -48,7 +43,7 @@ export default forwardRef<MapRef, Props>(({unitListRef, controller}, ref)=>{
             const x = scrollX + (e.nativeEvent.pageX - margin[0]) / TILESIZE
             const y = scrollY + (e.nativeEvent.pageY - margin[1]) / TILESIZE
             // console.log(Math.floor(x), Math.floor(y))
-            unitListRef.current.setTargetPos && unitListRef.current.setTargetPos([Math.floor(x) * TILESIZE, Math.floor(y) * TILESIZE])
+            controller.setTargetPos([Math.floor(x) * TILESIZE, Math.floor(y) * TILESIZE])
         }} activeOpacity={0.9}>
         {/* {data.colliding({x:scrollX, y:scrollY, width:windowResize.width/TILESIZE + 1, height:windowResize.height/TILESIZE + 1}).map(
             (item)=><ItemComponent {...item}/>

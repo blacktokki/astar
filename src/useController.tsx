@@ -1,9 +1,10 @@
 import { MutableRefObject, useRef } from 'react';
 import { TILESIZE } from './constants';
-import { Tiles, Units, Controller, Position, CameraRef, UnitInit } from './types'
+import { Tiles, Units, Controller, Position, CameraRef, UnitInit, UnitListRef, MapRef } from './types'
 
 const DUMMY_TILECOUNT = 256
 const DUMMY_TILEIDS_COUNT = 16
+const DUMMY_COUNT = 1599
 const INIT_POSITION:Position = [8 * TILESIZE, 8 * TILESIZE]
 
 const INIT_TILES:Tiles = {
@@ -18,7 +19,7 @@ const INIT_TILES:Tiles = {
     }, {} as Record<number, string>)
 }
 
-export default function useController(cameraRef:MutableRefObject<CameraRef>){
+export default function useController(unitListRef:MutableRefObject<UnitListRef>, mapRef:MutableRefObject<MapRef>, cameraRef:MutableRefObject<CameraRef>){
     const tiles = useRef(INIT_TILES)
     const player:UnitInit = {
         postMove:(nextPos)=>{
@@ -33,17 +34,20 @@ export default function useController(cameraRef:MutableRefObject<CameraRef>){
     const ai:UnitInit = {
         moveFinished:(unit)=>{
             unit.targetPos = [
-                Math.floor(Math.random() * tiles.current.width / 16) * TILESIZE, 
-                Math.floor(Math.random() * tiles.current.height / 16) * TILESIZE
+                Math.floor(Math.random() * tiles.current.width / 8) * TILESIZE, 
+                Math.floor(Math.random() * tiles.current.height / 8) * TILESIZE
             ]
         }
     }
     const INIT_UNITS:Units = [
         {id:0, initPos:INIT_POSITION, ...ai}
-    ].concat([...Array(999).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
+    ].concat([...Array(DUMMY_COUNT).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
     const units = useRef(INIT_UNITS)
     return {
         getTiles:() => tiles.current,
-        getUnits:() => units.current    
+        getUnits:() => units.current,
+        setTargetPos:(pos)=>{unitListRef.current.setTargetPos && unitListRef.current.setTargetPos(pos)},
+        setScrollX:(x)=>{mapRef.current.setScrollX && mapRef.current?.setScrollX(x)},
+        setScrollY:(y)=>{mapRef.current.setScrollY && mapRef.current?.setScrollY(y)}
     } as Controller
 }

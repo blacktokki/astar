@@ -18,6 +18,9 @@ export type CameraRef = {
 export type Controller = {
     getTiles: ()=>Tiles,
     getUnits: ()=>Units
+    setTargetPos: (pos:Position)=>void
+    setScrollX: (x:number)=>void,
+    setScrollY: (y:number)=>void
 }
 
 type Model = {}
@@ -39,6 +42,7 @@ export type Unit = Model & {
     id:number,
     initPos:Position,
     targetPos?:Position
+    nextPos?:Position
     movement?: {
      vecIdx:number,
      idx:number   
