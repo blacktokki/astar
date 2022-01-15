@@ -1,9 +1,10 @@
 import { useEffect, forwardRef, useImperativeHandle, useRef, memo, useMemo, useState } from 'react'
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Position, UnitListRef, Controller, Unit as UnitProps, Vector }from './types'
 import { TILESIZE, SPEED_PER_MS, VECTORS } from './constants'
 import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, withSequence } from 'react-native-reanimated';
 import Heap from 'heap';
+import Canvas from 'react-native-canvas';
 
 type ShareState = {
     x:number,
@@ -172,6 +173,21 @@ const finished = (currentPos:Position, unit:UnitProps)=>{
         unit.moveFinished(unit)
 }
 
+const Cvs = ({col}:{col:string})=>{
+    const ref = useRef<HTMLCanvasElement>(null)
+    const ref2 = useRef<Canvas>(null)
+    useEffect(()=>{
+        const ctx = (Platform.OS=='web'?ref.current:ref2.current)?.getContext('2d')
+        if(ctx){
+            ctx.fillStyle = col;
+            ctx.font = '16px serif'
+            ctx.fillRect(0, 0, 100, 100);
+            ctx.fillText("🐡", 0, 48)
+        }
+    })
+    const style = {width:8000, height:8000, borderWidth:10, borderColor:'#FF0000'}
+    return Platform.OS =='web'?<canvas width={style.width} height={style.height} style={style} ref={ref}/>:<Canvas style={style} ref={ref2}/>
+}
 
 export default forwardRef<UnitListRef, {controller:Controller}>(({controller}, ref)=>{
     const surfaceRef = useRef<SurfaceData[]>(VECTORS.map(v=>({vec:v})))
@@ -241,6 +257,12 @@ export default forwardRef<UnitListRef, {controller:Controller}>(({controller}, r
     }, [])
     return <View style={{...StyleSheet.absoluteFillObject, width:0, height:0}}>
         {surfaceRef.current.map((d, i)=><Surface key={i} data={d}/>)}
+        {/* <View style={styles.unit}>
+            <Cvs col={'rgba(0,0,0, 0.5)'}/>
+        </View>
+        <View style={[styles.unit, {left:50}]}>
+            <Cvs col={'rgba(255,0,0, 0.5)'}/>
+        </View> */}
     </View>
 })
 
