@@ -67,8 +67,9 @@ const Surface = ({data}:{data:SurfaceData}) =>{
         let emptyIdx = 0
         data.popEmptyIdx = ()=>{
             if (emptyIdx == moveableData.current.length){
+                const prevLen = moveableData.current.length
                 moveableData.current = moveableData.current.concat([...Array(BATCH_ELEMENT)].map((v)=>({initShareState:{x:INIT_POSITION[0], y:INIT_POSITION[1], visible:false}})))
-                emptyStack = emptyStack.concat([...Array(BATCH_ELEMENT).keys()].map((v)=>BATCH_ELEMENT + v))
+                emptyStack = emptyStack.concat([...Array(BATCH_ELEMENT).keys()].map((v)=>prevLen + v))
             }
             return emptyStack[emptyIdx++]
         },
@@ -135,11 +136,14 @@ const Surface = ({data}:{data:SurfaceData}) =>{
         // return ()=>clearInterval(it )
     }, [])
     useEffect(()=>{
+        let lock = true
         data.resize = async()=>{
-            if(moveable.length < moveableData.current.length){
-                console.log(data.vec, moveable.length, moveableData.current.length)
+            if(lock && moveable.length < moveableData.current.length){
+                lock = false
+                // console.log(data.vec, moveable.length, moveableData.current.length)
                 setMoveable(moveable.concat([...Array(BATCH_ELEMENT).keys()].map((v)=>{
                     return <Moveable key={moveable.length + v} data={moveableData.current[moveable.length + v]}/>})))
+                lock = true
             }
         }
     },[moveable])

@@ -4,7 +4,7 @@ import { Tiles, Units, Controller, Position, CameraRef, UnitInit, UnitListRef, M
 
 const DUMMY_TILECOUNT = 256
 const DUMMY_TILEIDS_COUNT = 16
-const DUMMY_COUNT = 1599
+const DUMMY_COUNT = 3999
 const INIT_POSITION:Position = [8 * TILESIZE, 8 * TILESIZE]
 
 const INIT_TILES:Tiles = {
