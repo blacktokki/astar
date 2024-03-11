@@ -37,7 +37,6 @@ const getNextPos = (currentPos:Position, targetPos:Position)=>{
 }
 
 const Unit = ({unit}:{unit:UnitProps})=>{
-    'worklet'
     const _styles = styles
     const [visible, setVisible] = useState(true)
     const runs = useSharedValue(1)
