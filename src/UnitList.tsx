@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Position, UnitListRef, Controller, Unit as UnitProps, ScrollInfo }from './types'
 import { TILESIZE, SPEED_PER_STEP, MS_PER_STEP } from './constants'
 import useInnerWindow from './useInnerWindow'
-import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, useCode, call, useAnimatedReaction, cancelAnimation } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, Easing, useAnimatedReaction, cancelAnimation } from 'react-native-reanimated';
 
 const fish = <Text style={{paddingLeft:6}}>🐟</Text>//🧍
 
@@ -14,7 +14,7 @@ const useTargetCursor = (targetPos:Animated.SharedValue<Position>)=>{
             transform: [
                 {translateX: targetPos.value[0]},
                 {translateY: targetPos.value[1]},
-            ],
+            ] as never[],
             width:TILESIZE, height:TILESIZE, borderWidth:2, borderColor:'greenyellow'
         };
     });
@@ -98,7 +98,7 @@ const Unit = ({unit}:{unit:UnitProps})=>{
             transform: [
                 {translateX: visible?livePos.value[0]:-1000},
                 {translateY: visible?livePos.value[1]:-1000},
-            ],
+            ] as never,
         }
     }, [visible]);
 
