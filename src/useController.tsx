@@ -45,7 +45,7 @@ export default function useController(
     }
     const INIT_UNITS:Units = [
         {id:0, initPos:INIT_POSITION, ...player}
-    ].concat([...Array(1000).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
+    ].concat([...Array(128).keys()].map((value)=>({id:value + 1, initPos:INIT_POSITION, ...ai})))
     const units = useRef(INIT_UNITS)
     // useEffect(()=>{
     //     const interval = setInterval(()=>{
